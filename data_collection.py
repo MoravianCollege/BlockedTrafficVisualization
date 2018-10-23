@@ -17,6 +17,7 @@ rcv_sock.bind((RCV_UDP_IP, RCV_UDP_PORT))
 app = Flask(__name__)
 
 q_being_used = False
+q = []
 
 def collect_data():
     while True:
@@ -27,13 +28,13 @@ def collect_data():
             # remove everything older than a minute
             for attack in q:
                 syslogmsg = attack.split(",")
-                attack_time = datetime.datetime.strptime(syslogmsg[0].replace("$
-                if(attack_time < datetime.datetime.now()-datetime.timedelta(sec$
+                attack_time = datetime.datetime.strptime(syslogmsg[0].replace(" ", ""), '%Y/%m/%d%H:%M:%S')
+                if (attack_time < datetime.datetime.now() - datetime.timedelta(seconds=60)):
                     q.remove(attack)
-            #add data to the list
-            q.append(data.replace(" ", ""))
+                # add data to the list
+                q.append(data.replace(" ", ""))
 
-@app.route('/timestamp')
+@ app.route('/timestamp')
 def getAllSince():
     timestamp = request.args.get('t')
     q_being_used = True
@@ -42,12 +43,14 @@ def getAllSince():
     for attack in q:
         line = attack.split(",")
         attack_time = datetime.datetime.strptime(line[0], '%Y/%m/%d%H:%M:%S')
-        if(attack_time>timestamp):
+        if (attack_time > timestamp):
             list_of_attacks.append(attack)
     q_being_used = False
     return str(list_of_attacks)
+
+
 if __name__ == "__main__":
-    data_collection_thread = Thread(target = collect_data)
+    data_collection_thread = Thread(target=collect_data)
     data_collection_thread.start()
     app.run(host="0.0.0.0", port=5000)
 
