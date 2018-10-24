@@ -17,13 +17,13 @@ def aggregate_data():
     while not call_made:
         # Receive message
         data, address = rcv_sock.recvfrom(1024)
- 	    # add IP to running list
+        # add IP to running list
         syslogmsg = data.split(",")
-        #ip_list.append(syslogmsg[1])
+        # ip_list.append(syslogmsg[1])
 
         ip = syslogmsg[1]
         if ip in ip_addresses:
-            ip_addresses[ip] +=1
+            ip_addresses[ip] += 1
         else:
             ip_addresses[ip] = 1
 
@@ -32,13 +32,16 @@ def aggregate_data():
 def send_data():
     call_made = True
     num_ips = int(request.args.get('num_ips'))
-    sorted_ips = sorted(ip_addresses, key=ip_addresses.__getitem__, reverse=Tru$
+    sorted_ips = sorted(ip_addresses, key=ip_addresses.__getitem__, reverse=True)
     ips_to_be_sent = []
     for i in range(num_ips):
         ips_to_be_sent.append(sorted_ips[i])
-	return str(ips_to_be_sent)
+    return str(ips_to_be_sent)
 
 if __name__ == "__main__":
     data_aggregation_thread = Thread(target = aggregate_data)
     data_aggregation_thread.start()
     app.run(host="0.0.0.0", port=5000)
+
+
+
