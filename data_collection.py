@@ -1,53 +1,75 @@
 import socket
 import sys
 import requests
-import Queue
 from flask import Flask, request
 import threading
 import datetime
+import mysql.connector
 
 # Create a TCP/IP socket for receiving data
 RCV_UDP_IP = "10.230.1.59"
 RCV_UDP_PORT = 5140
 
 # Bind the socket to the port
-rcv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+rcv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
 rcv_sock.bind((RCV_UDP_IP, RCV_UDP_PORT))
 
 app = Flask(__name__)
 
-lock = threading.Lock()
-q = []
+
+q=[] #replace with database
+mydb = mysql.connector.connect(
+  host="localhost",
+  user="testUser",
+  passwd="somekindapassword"
+)
+mycursor = mydb.cursor()
+
+mycursor.execute("CREATE DATABASE BlockedTrafficDatabase;")
+mycursor.execute("USE BlockedTrafficDatabase;")
+
+#Our database stores said data
+mycursor.execute(
+    "CREATE TABLE traffic(time VARCHAR(50) NOT NULL, protocol VARCHAR(50) NOT NULL, address VARCHAR(50) NOT NULL, PRIMARY KEY (address));")
 
 def collect_data():
     while True:
         # Receive message
         data, address = rcv_sock.recvfrom(1024)
-        #check if the other thread is using the list
-        lock.acquire()
-        for attack in q:
-            syslogmsg = attack.split(",")
-            attack_time = datetime.datetime.strptime(syslogmsg[0].replace(" ", ""), '%Y/%m/%d%H:%M:%S')
-            if (attack_time < datetime.datetime.now() - datetime.timedelta(seconds=60)):
-                q.remove(attack)
-            # add data to the list
-            q.append(data.replace(" ", ""))
-            lock.release()
+
+        # Parse original message and create a new one
+        syslogmsg = data.split(",")
+        store_data(syslogmsg)
+
+def store_data(data):
+    #timestamp of the attack
+    time = data[0]
+    #address of the attack
+    address = data[1]
+    #protocol (UDP or TDP)
+    protocol = data[2]
+
+    #Our database stores said data
+    try:
+        sql = "INSERT INTO traffic (time, protocol, address) VALUES (%s, %s, %s);"
+        val = (time, protocol, address)
+        mycursor.execute(sql, val)
+
+        mydb.commit()
+
+        print(mycursor.rowcount, "record inserted.")
+    except:
+        print("This piece of data failed to store: " + data)
 
 @ app.route('/timestamp')
 def getAllSince():
     timestamp = request.args.get('t')
-    lock.acquire()
     list_of_attacks = []
-    timestamp = datetime.datetime.strptime(timestamp, '%Y/%m/%d%H:%M:%S')
-    try:
-        for attack in q:
-            line = attack.split(",")
-            attack_time = datetime.datetime.strptime(line[0], '%Y/%m/%d%H:%M:%S')
-            if (attack_time > timestamp):
-                list_of_attacks.append(attack)
-    finally:
-        lock.release()
+    sql = "Select * FROM traffic WHERE time = '" + timestamp+ "';"
+    mycursor.execute(sql)
+    myresult = mycursor.fetchall()
+    for x in myresult:
+        list_of_attacks.append(x)
     return str(list_of_attacks)
 
 
