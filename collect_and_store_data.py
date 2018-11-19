@@ -1,8 +1,10 @@
+
 import socket
 import sys
 import requests
 import threading
 import pymysql
+import datetime
 
 # Create a TCP/IP socket for receiving data
 RCV_UDP_IP = "10.230.1.59"
@@ -11,14 +13,6 @@ RCV_UDP_PORT = 5140
 # Bind the socket to the port
 rcv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
 rcv_sock.bind((RCV_UDP_IP, RCV_UDP_PORT))
-
-# Set up database connection
-host = 'localhost'
-database = 'BlockedTrafficDatabase'
-user = 'root'
-
-# connects to the database
-conn = pymysql.connect(host=host, user=user, db=database)
 
 # Thread that constantly collects data
 def collect_data():
@@ -40,19 +34,36 @@ def store_data(data):
     protocol = data[2]
     
     try:
-        cursor = conn.cursor()
+        # Set up database connection
+        host = 'localhost'
+        database = 'BlockedTrafficDatabase'
+        user = 'root'
+        password = 'traffic'
 
-        # mysql statement
-        traffic_add_sql = 'INSERT INTO traffic VALUES (%s, %s, %s)'
+        # connects to the database
+        conn = pymysql.connect(host=host, user=user, password=password, db=database)
 
-        # execution statement
-        cursor.execute(traffic_add_sql, (time, address, protocol))
-        conn.commit()
-        conn.close()
+        # Check if timestamp is valid
+        times = time.split(" ")
+        if times[0][4] == "/" and times[0][7] == "/" and times[1][2] == ":" and times[1][5] == ":":
+            # Check if IP address is valid
+            if socket.inet_aton(address):
+                # Check if protocol is valid
+                if protocol == "tcp" or protocol == "udp" or protocol == "icmp":
+                    # Create MySQL cursor
+                    cursor = conn.cursor()
+
+                    # mysql statement
+                    traffic_add_sql = 'INSERT INTO traffic VALUES (%s, %s, %s)'
+
+                    # execution statement
+                    cursor.execute(traffic_add_sql, (time, address, protocol))
+                    conn.commit()
+                    conn.close()
 
     except:
-        print("This piece of data failed to store: " + data)
+        print("Not added to the database: ", data)
 
-# Start the collector thread
- data_collection_thread = Thread(target = collect_data)
- data_collection_thread.start()
+collect_data()
+
+       
