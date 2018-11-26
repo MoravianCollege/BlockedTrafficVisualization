@@ -10,7 +10,7 @@ USE BlockedTrafficDatabase;
 # Setup for each of the tables inside the BlockedTraffic database
 
 CREATE TABLE traffic(
-  timeOf VARCHAR(50) NOT NULL,
+  timeOf TIMESTAMP NOT NULL,
   protocol VARCHAR(50) NOT NULL,
   address VARCHAR(50) NOT NULL,
   PRIMARY KEY (address));
